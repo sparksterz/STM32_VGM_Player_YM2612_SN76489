@@ -58,5 +58,5 @@ struct GD3
     }
 };
 
-enum FileStrategy {FIRST_START, NEXT, PREV, RND, REQUEST};
+enum FileStrategy {FIRST_START, NEXT, PREV, RND, REQUEST, JUMP_FORWARD, JUMP_BACKWARD};
 enum PlayMode {LOOP, PAUSE, SHUFFLE, IN_ORDER};

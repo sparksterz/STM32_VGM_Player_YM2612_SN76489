@@ -94,6 +94,7 @@ uint32_t pcmBufferPosition = 0;
 //VGM Variables
 uint16_t loopCount = 0;
 uint8_t maxLoops = 3;
+uint8_t skipChunkSize = 25;
 bool fetching = false;
 volatile bool ready = false;
 bool samplePlaying = false;
@@ -257,6 +258,7 @@ bool startTrack(FileStrategy fileStrategy, String request)
       }
       else
           currentFileNumber++;
+
       nextFile.openNext(SD.vwd(), O_READ);
       nextFile.getName(fileName, MAX_FILE_NAME_SIZE);
       nextFile.close();
@@ -265,29 +267,56 @@ bool startTrack(FileStrategy fileStrategy, String request)
     case PREV:
     {
       if(currentFileNumber != 0)
-      {
         currentFileNumber--;
-        SD.vwd()->rewind();
-        for(uint32_t i = 0; i<=currentFileNumber; i++)
-        {
-          nextFile.close();
-          nextFile.openNext(SD.vwd(), O_READ);
-        }
-        nextFile.getName(fileName, MAX_FILE_NAME_SIZE);
-        nextFile.close();
-      }
       else
-      {
         currentFileNumber = numberOfFiles-1;
-        SD.vwd()->rewind();
-        for(uint32_t i = 0; i<=currentFileNumber; i++)
-        {
-          nextFile.close();
-          nextFile.openNext(SD.vwd(), O_READ);
-        }
-        nextFile.getName(fileName, MAX_FILE_NAME_SIZE);
+
+      SD.vwd()->rewind();
+      for(uint32_t i = 0; i<=currentFileNumber; i++)
+      {
         nextFile.close();
+        nextFile.openNext(SD.vwd(), O_READ);
       }
+      nextFile.getName(fileName, MAX_FILE_NAME_SIZE);
+      nextFile.close();
+    }
+    break;
+    case JUMP_FORWARD:
+    {
+      //Add the jump amount
+      currentFileNumber = currentFileNumber+skipChunkSize;
+
+      //Don't wrap around, if increasing pin to last
+      if (currentFileNumber > numberOfFiles)
+        currentFileNumber = numberOfFiles - 1;
+      
+      SD.vwd()->rewind();
+      for(uint32_t i = 0; i<=currentFileNumber; i++)
+      {
+        nextFile.close();
+        nextFile.openNext(SD.vwd(), O_READ);
+      }
+      nextFile.getName(fileName, MAX_FILE_NAME_SIZE);
+      nextFile.close();
+    }
+    break;
+    case JUMP_BACKWARD:
+    {
+      //Subtract the jump amount
+      currentFileNumber = currentFileNumber-skipChunkSize;
+
+      //Don't wrap around, if decreasing pin to 0
+      if(currentFileNumber < 0)
+        currentFileNumber = 0;
+
+      SD.vwd()->rewind();
+      for(uint32_t i = 0; i<=currentFileNumber; i++)
+      {
+        nextFile.close();
+        nextFile.openNext(SD.vwd(), O_READ);
+      }
+      nextFile.getName(fileName, MAX_FILE_NAME_SIZE);
+      nextFile.close();
     }
     break;
     case RND:
@@ -822,7 +851,7 @@ void handleButtons()
   bool togglePlaymode = false;
   uint32_t count = 0;
   
-  if(!digitalRead(next_btn))
+  if(!digitalRead(next_btn)) 
     newTrack = startTrack(NEXT);
   if(!digitalRead(prev_btn))
     newTrack = startTrack(PREV);
@@ -832,6 +861,18 @@ void handleButtons()
     togglePlaymode = true;
   else
     buttonLock = false;
+
+  /*//Skip multiple songs backward
+  while(!digitalRead(next_btn))
+  {
+
+  }
+  //Skip multiple songs forward
+  while(!digitalRead(next_btn))
+  {
+
+  }*/
+  //Switch the OLED on and off
   while(!digitalRead(option_btn))
   {
     if(count >= 100) 
@@ -846,14 +887,20 @@ void handleButtons()
     delay(10);
     count++;
   }
+
   if(buttonLock)
+  {
     togglePlaymode = false;
+    newTrack = false;
+  }
+
   if(newTrack)
   {
     vgmVerify();
     prepareChips();
     delay(100);
   }
+
   if(togglePlaymode)
   {
     togglePlaymode = false;
